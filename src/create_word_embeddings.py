@@ -137,9 +137,13 @@ def main(corpus_path: str = None, window_size: int = 0, save_embeddings: bool = 
         print(f"{window_size}-word embeddings (as PyTorch tensors): ", we.word_embeddings)
 
     if save_embeddings:
-        output_file = f"word_embeddings_window-size={window_size}.pt"
-        torch.save(we.word_embeddings, output_file)
-        print(f"Embeddings saved to {output_file}")
+        vocab_output_file = f"vocab.pt"
+        glove_embeddings_output_file = f"glove_embeddings.pt"
+        word_embeddings_output_file = f"word_embeddings_window-size={window_size}.pt"
+        torch.save(we.vocab, vocab_output_file)
+        torch.save(we.glove_embeddings, glove_embeddings_output_file)
+        torch.save(we.word_embeddings, word_embeddings_output_file)
+        print(f"Vocabulary saved to {vocab_output_file}, glove embeddings saved to {glove_embeddings_output_file} and word embeddings saved to {word_embeddings_output_file}.")
 
 
 if __name__ == "__main__":
