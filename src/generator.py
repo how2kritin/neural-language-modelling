@@ -36,6 +36,7 @@ def calculate_and_save_perplexities(sentences: list[list[str]], ngm: NGramModel 
         for sentence_text, perplexity in results:
             f.write(f"{sentence_text}\t{perplexity}\n")
 
+
 def main(N: int, lm_type: str, corpus_path: str, k: int, gen_type: str) -> None:
     match lm_type:
         case 'f':
@@ -63,10 +64,12 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, gen_type: str) -> None:
     input_sentence = str(input('input sentence: '))
 
     if gen_type == 's':
-        generated_list_of_words = ngm.generate_sentence_next_n_words(tokenized_sentence=word_tokenizer(input_sentence)[0], n=k)
+        generated_list_of_words = ngm.generate_sentence_next_n_words(
+            tokenized_sentence=word_tokenizer(input_sentence)[0], n=k)
         print(detokenize(generated_list_of_words))
     elif gen_type == 'w':
-        predicted_words_dict = ngm.predict_next_word(tokenized_sentence=word_tokenizer(input_sentence)[0], n_candidates_for_next_word=k)
+        predicted_words_dict = ngm.predict_next_word(tokenized_sentence=word_tokenizer(input_sentence)[0],
+                                                     n_candidates_for_next_word=k)
         if len(predicted_words_dict) == 0:
             print("Could not predict any possible candidates for the next word.")
             return
@@ -74,8 +77,6 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, gen_type: str) -> None:
         print("output:")
         for key, val in predicted_words_dict.items():
             print(key, val)
-
-
 
 
 if __name__ == "__main__":
