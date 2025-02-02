@@ -60,18 +60,15 @@ class WordEmbeddings:
                 values = line.split()
                 word = values[0]
                 if word in vocab:
-                    try:
-                        vector = torch.tensor([float(val) for val in values[1:]], dtype=torch.float32,
-                                              device=self.device)
-                        embeddings[vocab[word]] = vector
-                    except ValueError:
-                        continue
+                    vector = torch.tensor([float(val) for val in values[1:]], dtype=torch.float32,
+                                          device=self.device)
+                    embeddings[vocab[word]] = vector
         return embeddings
 
     def _create_word_embeddings(self, tokenized_sentences: list[list[str]], vocab: dict, embeddings: torch.Tensor,
                                 window_size: int = 0) -> list[torch.Tensor]:
         """
-        Create word embeddings of window_size using the loaded GloVe embeddings
+        Create word embeddings of window_size using the loaded GloVe embeddings.
         :param tokenized_sentences:
         :param vocab:
         :param embeddings:
@@ -109,11 +106,11 @@ class WordEmbeddings:
 
 def main(corpus_path: str = None, window_size: int = 0, save_embeddings: bool = False):
     """
-    :Ref: https://nlp.stanford.edu/projects/glove/ for Common Crawl (840B tokens, 2.2M vocab, cased, 300d vectors, 2.03 GB download)
+    :Ref: https://nlp.stanford.edu/projects/glove/ for Wikipedia 2014 + Gigaword 5 (6B tokens, 400K vocab, uncased 300d vectors)
     :return:
     """
 
-    glove_file = '../glove.840B.300d.txt'
+    glove_file = '../glove.6B.300d.txt'
     embedding_dim = 300
     if not corpus_path:
         inp_sentence = str(input("your text: "))

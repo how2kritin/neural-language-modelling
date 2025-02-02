@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import math
 
 
 class LSTMLM(nn.Module):
@@ -40,9 +41,9 @@ class LSTMLM(nn.Module):
             self.norm = nn.LayerNorm(hidden_size).to(self.device)
         self.fc = nn.Linear(hidden_size, vocab_size).to(self.device)
         self.softmax = nn.Softmax(dim=-1).to(self.device)
-        self.optimizer_name = optimizer
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
-        self.loss_fn = nn.CrossEntropyLoss().to(self.device)
+        self.loss_fn = nn.CrossEntropyLoss(reduction='none').to(
+            self.device)  # changed reduction to 'none' to compute per-sample loss
         self.to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -57,32 +58,38 @@ class LSTMLM(nn.Module):
         probabilities = self.softmax(logits)
         return probabilities
 
+    def _calculate_perplexity(self, loss: torch.Tensor) -> float:
+        """
+        To calculate perplexity from the loss.
+        """
+        return math.exp(loss)
+
     def train_model(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None) -> None:
         for epoch in range(self.n_epochs):
             self.train()
             train_loss = 0.0
-            train_correct = 0
             train_total = 0
 
             for inputs, targets in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.n_epochs}"):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
-                loss = self.loss_fn(outputs, targets)
+
+                losses = self.loss_fn(outputs, targets)
+
+                loss = losses.mean()
                 loss.backward()
                 self.optimizer.step()
-                train_loss += loss.item()
-                _, predicted = outputs.max(dim=1)  # getting IDs of predicted tokens
-                train_total += targets.size(0)
-                train_correct += (predicted == targets).sum().item()
 
-            train_loss /= len(train_loader)
-            train_accuracy = train_correct / train_total
+                train_loss += losses.sum().item()
+                train_total += targets.size(0)
+
+            train_loss /= train_total
+            train_perplexity = self.calculate_perplexity(train_loss)
 
             if val_loader is not None:
                 self.eval()
                 val_loss = 0.0
-                val_correct = 0
                 val_total = 0
 
                 with torch.no_grad():
@@ -90,18 +97,20 @@ class LSTMLM(nn.Module):
                         inputs, targets = inputs.to(self.device), targets.to(self.device)
                         outputs = self(inputs)
 
-                        val_loss += self.loss_fn(outputs, targets).item()
-                        _, predicted = outputs.max(dim=1)
+                        # calculating loss per sample
+                        losses = self.loss_fn(outputs, targets)
+                        val_loss += losses.sum().item()
                         val_total += targets.size(0)
-                        val_correct += (predicted == targets).sum().item()
 
-                val_loss /= len(val_loader)
-                val_accuracy = val_correct / val_total
+                val_loss /= val_total
+                val_perplexity = self._calculate_perplexity(val_loss)
 
-                print(f'Epoch {epoch + 1}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, '
-                      f'Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}')
+                print(f'Epoch {epoch + 1}, '
+                      f'Train Loss: {train_loss:.4f}, Train Perplexity: {train_perplexity:.4f}, '
+                      f'Val Loss: {val_loss:.4f}, Val Perplexity: {val_perplexity:.4f}')
             else:
-                print(f'Epoch {epoch + 1}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}')
+                print(f'Epoch {epoch + 1}, '
+                      f'Train Loss: {train_loss:.4f}, Train Perplexity: {train_perplexity:.4f}')
 
     def predict_top_k(self, x: torch.Tensor, k: int) -> list:
         """
