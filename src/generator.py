@@ -78,4 +78,48 @@
 #         print("output:")
 #         for key, val in predicted_words_dict.items():
 #             print(key, val)\
+import os.path
+from tokenizer import word_tokenizer
+from create_word_embeddings import obtain_train_test_val_datasets, load_glove_embeddings
+from LSTM import LSTMLM
+import torch
+from torch.utils.data import DataLoader
+import random
+import numpy as np
 
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+def main():
+    set_seed(42)
+
+    glove_file = '../glove.6B.300d.txt'
+    corpus_path = "../corpus/Pride_and_Prejudice.txt"
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    try:
+        with open(corpus_path, "r") as file:
+            text = file.read()
+            tokenized_sentences = word_tokenizer(text)
+    except FileNotFoundError:
+        raise FileNotFoundError("Unable to find a file at that path to use as the corpus!")
+    vocab, idx2word, train_loader, valid_loader, test_loader = obtain_train_test_val_datasets(
+        tokenized_sentences=tokenized_sentences, train_fraction=0.8, test_fraction=0.1,
+        max_seq_len=25, batch_size=32)
+    glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
+
+    model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3, 'embedding_dim': 300,
+                    'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 3, 'device': device}
+    model = LSTMLM(**model_params)
+    if os.path.exists("../pretrained_models/LSTM_PnP.pt"):
+        model.load_state_dict(torch.load("../pretrained_models/LSTM_PnP.pt"))
+    else:
+        model.train_model(train_loader, valid_loader)
+
+
+if __name__ == "__main__":
+    main()

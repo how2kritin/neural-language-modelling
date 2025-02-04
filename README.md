@@ -1,6 +1,10 @@
 # Neural Language Modeling
 
+---
+
 # Resources
+
+---
 
 # Pre-requisites
 
@@ -9,6 +13,8 @@
 3. [pytorch](https://pytorch.org/get-started/locally/)
 4. (OPTIONAL) `virtualenv` to create a virtual environment.
 5. All the python libraries mentioned in `requirements.txt`.
+
+---
 
 # Tokenization
 
