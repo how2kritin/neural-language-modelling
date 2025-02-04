@@ -1,9 +1,8 @@
-from typing import Optional, Literal
+from typing import Optional
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import math
 
 
 class LSTMLM(nn.Module):
@@ -30,6 +29,7 @@ class LSTMLM(nn.Module):
         self.n_epochs = n_epochs
         self.hidden_size = hidden_size
         self.n_layers = n_layers
+        self.vocab = vocab
         self.vocab_size = len(vocab)
         self.dropout_rate = dropout_rate
         self.device = device
@@ -51,7 +51,7 @@ class LSTMLM(nn.Module):
             weight_decay=0.01  # L2 regularization
         )
         self.layer_norm = nn.LayerNorm(hidden_size)
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=vocab['<PAD>'])
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=vocab['<PAD>'], reduction='none')
 
         self.to(self.device)
 
@@ -71,32 +71,47 @@ class LSTMLM(nn.Module):
         for epoch in range(self.n_epochs):
             self.train()
             train_total_loss = 0
+            train_total_tokens = 0
 
             for inputs, targets in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.n_epochs}"):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = self.loss_fn(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-                loss.backward()
-                self.optimizer.step()
-                train_total_loss += loss.item()
+                mask = (targets.view(-1) != self.vocab['<PAD>']).float()
 
-            avg_train_loss = train_total_loss / len(train_loader)
+                num_valid_tokens = mask.sum()
+                masked_loss = (loss * mask).sum()
+                mean_loss = masked_loss / num_valid_tokens
+
+                mean_loss.backward()
+                self.optimizer.step()
+
+                train_total_loss += masked_loss.item()
+                train_total_tokens += num_valid_tokens.item()
+
+            avg_train_loss = train_total_loss / train_total_tokens
             train_perplexity = torch.exp(torch.tensor(avg_train_loss))
 
             if val_loader is not None:
                 self.eval()
                 val_total_loss = 0
+                val_total_tokens = 0
 
                 with torch.no_grad():
                     for inputs, targets in val_loader:
                         inputs, targets = inputs.to(self.device), targets.to(self.device)
                         outputs = self(inputs)
                         loss = self.loss_fn(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-                        val_total_loss += loss.item()
+                        mask = (targets.view(-1) != self.vocab['<PAD>']).float()
+                        num_valid_tokens = mask.sum()
+                        masked_loss = (loss * mask).sum()
 
-                avg_val_loss = val_total_loss / len(val_loader)
-                val_perplexity = torch.exp(torch.tensor(avg_val_loss))
+                        val_total_loss += masked_loss.item()
+                        val_total_tokens += num_valid_tokens.item()
+
+                    avg_val_loss = val_total_loss / val_total_tokens
+                    val_perplexity = torch.exp(torch.tensor(avg_val_loss))
 
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss

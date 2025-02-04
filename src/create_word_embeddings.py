@@ -47,14 +47,16 @@ class CustomDataset(Dataset):
         return torch.tensor(input_idxs), torch.tensor(target_idxs)
 
 
-def obtain_train_test_val_datasets(tokenized_sentences: list[list[str]], train_fraction: float, test_fraction: float,
+def obtain_train_test_val_datasets(tokenized_sentences: list[list[str]], n_test_sents: int,
                                    max_seq_len: int, batch_size: int):
     random.shuffle(tokenized_sentences)
 
     total_size = len(tokenized_sentences)
-    train_size = int(train_fraction * total_size)
-    test_size = int(test_fraction * total_size)
-    val_size = total_size - (train_size + test_size)
+    test_size = min(n_test_sents, total_size)
+
+    remaining_data = total_size - test_size
+    train_size = int(0.9 * remaining_data)
+    val_size = remaining_data - train_size
 
     pad_token = "<PAD>"
 
@@ -73,11 +75,6 @@ def obtain_train_test_val_datasets(tokenized_sentences: list[list[str]], train_f
             input_tokenized_corpus.append(input_seq)
             target_tokenized_corpus.append(target_seq)
 
-    print("Input Sequences: ", input_tokenized_corpus[:1])
-    print("len: ", len(input_tokenized_corpus[0]))
-    print("Target Sequences: ", target_tokenized_corpus[:1])
-    print("len: ", len(target_tokenized_corpus[0]))
-
     # split the sentences into train, test and validation
     input_train_sentences = input_tokenized_corpus[:train_size]
     input_valid_sentences = input_tokenized_corpus[train_size: train_size + val_size]
@@ -86,31 +83,25 @@ def obtain_train_test_val_datasets(tokenized_sentences: list[list[str]], train_f
     target_valid_sentences = target_tokenized_corpus[train_size: train_size + val_size]
     target_test_sentences = target_tokenized_corpus[train_size + val_size:]
 
-    print("total_sentences: ", total_size)
-    print("train_sentences: ", len(input_train_sentences))
-    print("valid_sentences: ", len(input_valid_sentences))
-    print("test_sentences: ", len(input_test_sentences))
-    print("train_sentences: ", len(target_train_sentences))
-    print("valid_sentences: ", len(target_valid_sentences))
-    print("test_sentences: ", len(target_test_sentences))
+    print(f"num total_tokenized_{max_seq_len}_length_sentences: ", len(input_tokenized_corpus))
+    print(f"num train_tokenized_{max_seq_len}_length_sentences: ", len(input_train_sentences))
+    print(f"num valid_tokenized_{max_seq_len}_length_sentences: ", len(input_valid_sentences))
+    print(f"num test_tokenized_{max_seq_len}_length_sentences: ", len(input_test_sentences))
 
     train_tokenized_corpus = tokenized_sentences[:train_size]
     tokens = []
     for sentence in train_tokenized_corpus:  # only include train vocab in the vocabulary
         tokens.extend(sentence)
 
-    print("Text file preprocessed")
     vocab, idx2word = build_vocab(tokens)
     print("Vocabulary created for training dataset, which has been randomly sampled from the corpus.")
-
-    generator = torch.Generator(device='cpu')
 
     train_dataset = CustomDataset(input_train_sentences, target_train_sentences, vocab, seq_length=max_seq_len)
     valid_dataset = CustomDataset(input_valid_sentences, target_valid_sentences, vocab, seq_length=max_seq_len)
     test_dataset = CustomDataset(input_test_sentences, target_test_sentences, vocab, seq_length=max_seq_len)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, generator=generator)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, generator=generator)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, generator=generator)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     print("Data Loaded Successfully")
 
     return vocab, idx2word, train_loader, valid_loader, test_loader
