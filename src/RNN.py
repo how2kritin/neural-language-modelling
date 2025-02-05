@@ -1,46 +1,63 @@
-from typing import Optional
+from typing import Literal, Optional
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-class LSTMLM(nn.Module):
+class RNNLM(nn.Module):
     """
-    Ref: https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
+    RNN Ref: https://pytorch.org/docs/stable/generated/torch.nn.RNN.html
+    LSTM Ref: https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
+    GRU Ref: https://pytorch.org/docs/stable/generated/torch.nn.GRU.html
     """
 
-    def __init__(self, learning_rate: float, vocab: dict, hidden_size: int, n_layers: int, embedding_dim: int, pretrained_embeds: torch.Tensor,
-                 dropout_rate: float = 0.0, n_epochs: int = 10, patience: int = 3, device: str = "cpu"):
+    def __init__(self, learning_rate: float, vocab: dict, hidden_size: int, n_layers: int,
+                 pretrained_embeds: torch.Tensor, rnn_type: Literal['rnn', 'lstm', 'gru'], dropout_rate: float = 0.0,
+                 n_epochs: int = 10, patience: int = 3, device: str = "cpu"):
         """
-        RNN model implemented using LSTM layers. Used for next word prediction (language modelling).
+        RNN model with the ability to choose either RNN/LSTM/GRU layers. Used for next word prediction (language modeling).
         Includes a train_model() loop, as well as a function to predict the top k candidates for the next word.
 
         :param learning_rate: Learning rate of the model to start training with.
         :param vocab: The vocabulary.
         :param hidden_size: Number of features in the hidden state.
-        :param n_layers: Number of LSTM layers.
-        :param embedding_dim: Dimensions of each embedding vector.
+        :param n_layers: Number of RNN/LSTM/GRU layers.
+        :param pretrained_embeds: Pretrained embedding tensor.
+        :param rnn_type: Type of recurrent layer to use ('rnn', 'lstm', or 'gru').
         :param dropout_rate: 0 by default. Set a value between 0 and 1 to enable dropout.
         :param n_epochs: Number of epochs this algorithm is supposed to run for in the training loop.
+        :param patience: Number of consecutive iterations of validation loss being worse than the best validation loss (achieved during training) before terminating training.
         """
-        super(LSTMLM, self).__init__()
+        super(RNNLM, self).__init__()
         self.learning_rate = learning_rate
         self.n_epochs = n_epochs
         self.hidden_size = hidden_size
         self.n_layers = n_layers
         self.vocab = vocab
         self.vocab_size = len(vocab)
+        self.embedding_dim = pretrained_embeds.size(1)
         self.dropout_rate = dropout_rate
         self.device = device
         self.patience = patience
+        self.rnn_type = rnn_type.lower()
 
-        self.lstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_size, num_layers=n_layers, batch_first=True,
-                            dropout=dropout_rate)
-        self.embeddings = nn.Embedding(self.vocab_size, embedding_dim)
+        rnn_layer = {
+            'rnn': nn.RNN,
+            'lstm': nn.LSTM,
+            'gru': nn.GRU
+        }[self.rnn_type]
+        self.rnn = rnn_layer(
+            input_size=self.embedding_dim,
+            hidden_size=hidden_size,
+            num_layers=n_layers,
+            batch_first=True,
+            dropout=dropout_rate if n_layers > 1 else 0  # dropout between RNN's hidden layers
+        )
+        self.embeddings = nn.Embedding(self.vocab_size, self.embedding_dim)
         self.embeddings.weight.data.copy_(pretrained_embeds)
-        self.dropout = nn.Dropout(dropout_rate)
-        self.emb_dropout = nn.Dropout(dropout_rate * 0.5)
+        self.dropout = nn.Dropout(dropout_rate)  # to apply dropout after RNN's output (before FC)
+        self.emb_dropout = nn.Dropout(dropout_rate * 0.5)  # dropout after embeddings
         self.fc = nn.Linear(hidden_size, self.vocab_size)
         nn.init.xavier_uniform_(self.fc.weight)
         nn.init.zeros_(self.fc.bias)
@@ -56,12 +73,21 @@ class LSTMLM(nn.Module):
         self.to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        batch_size = x.size(0)
+        h0 = torch.zeros(self.n_layers, batch_size, self.hidden_size).to(self.device)  # init hidden states
+
+        if self.rnn_type == 'lstm':  # as LSTM needs both hidden state and cell state
+            c0 = torch.zeros(self.n_layers, batch_size, self.hidden_size).to(self.device)
+            hidden = (h0, c0)
+        else:  # as RNN and GRU only need hidden state
+            hidden = h0
+
         embeds = self.embeddings(x)
         embeds = self.emb_dropout(embeds)
-        lstm_out, _ = self.lstm(embeds)  # shape: (batch_size, seq_length, hidden_dim)
-        lstm_out = self.layer_norm(lstm_out)
-        lstm_out = self.dropout(lstm_out)
-        logits = self.fc(lstm_out)
+        rnn_out, _ = self.rnn(embeds, hidden)  # shape: (batch_size, seq_length, hidden_dim)
+        rnn_out = self.layer_norm(rnn_out)
+        rnn_out = self.dropout(rnn_out)
+        logits = self.fc(rnn_out)
         return logits
 
     def train_model(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None) -> None:

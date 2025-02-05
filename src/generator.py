@@ -82,12 +82,13 @@ import argparse
 import math
 import os.path
 from tqdm import tqdm
-from tokenizer import word_tokenizer
-from create_word_embeddings import obtain_train_test_val_datasets, load_glove_embeddings
-from LSTM import LSTMLM
 import torch
 import random
 import numpy as np
+from tokenizer import word_tokenizer
+from create_word_embeddings import obtain_train_test_val_datasets, load_glove_embeddings
+from RNN import RNNLM
+from FFNN import FFNNLM
 
 
 def set_seed(seed=42):
@@ -141,8 +142,9 @@ def generate_perplexity_report(model, vocab, data_loader, output_file):
     return avg_perplexity
 
 
-def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: str, perplexity_report_name: str) -> None:
-    set_seed(42)
+def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: str,
+         perplexity_report_name: str) -> None:
+    set_seed(42)  # setting a seed for reproducibility
 
     glove_file = '../glove.6B.300d.txt'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -158,10 +160,19 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
         tokenized_sentences=tokenized_sentences, n_test_sents=1000, max_seq_len=50, batch_size=32)
     glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
 
-    model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3, 'embedding_dim': 300,
+    model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
                     'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
                     'device': device}
-    model = LSTMLM(**model_params)
+    match lm_type:
+        case 'f':
+            model = FFNNLM(**model_params)
+        case 'r':
+            model = RNNLM(**model_params, rnn_type='rnn')
+        case 'l':
+            model = RNNLM(**model_params, rnn_type='lstm')
+        case _:
+            raise ValueError("Please choose a valid model! Acceptable inputs: {f, r, l}")
+
     if model_path and os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path))
     else:
@@ -182,13 +193,15 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', type=int, required=False, default=None, help='N-gram size. Need to specify this only for FFNN.')
+    parser.add_argument('-n', type=int, required=False, default=None,
+                        help='N-gram size. Need to specify this only for FFNN.')
     parser.add_argument('-l', type=str, required=True, choices=['f', 'r', 'l'], help='LM type')
     parser.add_argument('-c', type=str, required=True, help='Path to the corpus')
     parser.add_argument('-k', type=int, required=False, default=None, help='Number of words to generate')
     parser.add_argument('-m', type=str, required=False, default=None, help='Path to the model (if it already exists)')
-    parser.add_argument('-t', type=str, required=True, choices=['pe', 'pr'], help='Task to perform (perplexity report generation or next word prediction)')
-    parser.add_argument('-p', type=str, required=False, default=None, help='Name of the perplexity report. Need to specify this only for task="pe".')
+    parser.add_argument('-t', type=str, required=True, choices=['pe', 'pr'],
+                        help='Task to perform (perplexity report generation or next word prediction)')
+    parser.add_argument('-p', type=str, required=False, default=None,
+                        help='Name of the perplexity report. Need to specify this only for task="pe".')
     args = parser.parse_args()
     main(args.n, args.l, args.c, args.k, args.m, args.t, args.p)
-
