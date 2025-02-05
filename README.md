@@ -1,8 +1,8 @@
-# Neural Language Modeling
+# Neural Language Modelling
 
----
-
-# Resources
+Neural Network models, such as Feed-Forward Neural Network, Recurrent Neural Network and Long-Short Term Memory neural
+network used for language modelling. Implemented in Python using PyTorch. This corresponds to Assignment-2 of the
+Introduction to Natural Language Processing course at IIIT Hyderabad, taken in the Spring'25 semester.
 
 ---
 
@@ -18,22 +18,50 @@
 
 # Tokenization
 
-
+Using NLTK with `punkt_tab` tokenizer to tokenize corpus into list of sentences, where each sentence is a list of
+tokens. Additionally, processing URLs, mentions, ages, hashtags and time data.
 
 ---
 
-# Smoothing and Interpolation
+# Generation
 
 ## Instructions to run
 
-```python3 language_model.py <N> <lm_type> <corpus_path> <task>```  
-Here, `<lm_type>` must be one of `l` for Laplace Smoothing, `g` for Good-Turing Smoothing, `i` for Linear
-Interpolation, 'n' for No Smoothing.  
-`<N>` is the $N$-gram size, `<corpus_path>` is the path to the corpus and `<task>` is either 'pr' to get probability of
-sentence (must provide a sentence as input when prompted), or `pe` to get the avg perplexity of the corpus and the
-perplexity of 1000 train and 1000 test sentences.
+### Usage
 
-### How to obtain perplexity?
+```bash
+python3 generator.py -l <lm_type> -c <corpus_path> -t <task> [-n <N>] [-k <num_words>] [-m <model_path>] [-p <report_name>]
+```
+
+### Arguments
+
+- `-l <lm_type>` : Specifies the language model type. Must be one of:
+    - `'f'` : Feed Forward Neural Network LM (FFNN LM)
+    - `'r'` : Recurrent Neural Network LM (RNN LM)
+    - `'l'` : Long Short-Term Memory LM (LSTM LM)
+- `-c <corpus_path>` : Path to the corpus file.
+- `-t <task>` : Task to perform. Must be one of:
+    - `'pr'` : Next-word prediction (requires a sentence input).
+    - `'pe'` : Generate a perplexity report.
+
+### Optional Arguments
+
+- `-n <N>` : N-gram size (only required for FFNN models).
+- `-k <num_words>` : Number of candidates to predict for the next word, given a context.
+- `-m <model_path>` : Path to a pre-existing model (if available).
+- `-p <report_name>` : Name of the perplexity report (only required for `pe` task).
+
+### Example Usage
+
+```bash
+python3 generator.py -l f -c data/corpus.txt -t pr
+```
+
+```bash
+python3 generator.py -l r -c data/corpus.txt -t pe -p report.txt
+```
+
+## How to obtain perplexity?
 
 Run ```python3 language_model.py <N> <lm_type> <corpus_path> pe``` to automatically generate two files at
 `./perplexity_scores/` directory; one for the train set and another for the test set. The number at the top of the file
@@ -49,117 +77,9 @@ $$PP(w) = \root{N}\of{\frac{1}{\prod{P(w_i|w_{i-n+1}...w_{i-1})}}}$$
 
 for the sake of numerical stability.
 
-## Different types of smoothing used, and their logic
-
-### Laplace Smoothing
-
-$$P(w|h) = \frac{c(w,h) + 1}{c(h) + V}$$
-
-where $V$ is the total vocabulary size (assumed known).
-
-Essentially, we pretend that we saw every word once more than we actually did. Hence, it is also called "Add-One"
-smoothing.
-
-### Good-Turing Smoothing
-
-$$P_{GT}(w_1...w_n) = \frac{r^*}{N}$$
-
-where:
-
-$$r^* = \frac{(r + 1)S(N_{r + 1})}{S(N_r)}$$
-
-and
-
-$$N = \sum rN_r$$
-
-Here, $S(\cdot)$ is the smoothed function. For small values of $r$, $S(N_r) = N_r$ is a reasonable assumption (no
-smoothing is performed). N is the total number of objects observed, i.e., it is the total number of $n$-grams. However,
-for larger values of $r$, values of $S(N_r)$ are read off the regression line given by
-the logarithmic relationship
-
-$$log(N_r) = a + blog(r)$$
-
-where $N_r$ is the number of times $n$-grams of frequency $r$
-have occurred.
-
-However, this plot of $log(N_r)$ versus $log(r)$ is problematic because for large $r$, many $N_r$ will be zero. Instead,
-we plot a revised quantity, $log(Z_r)$ versus $log(r)$, where $Z_r$ is defined as
-
-$$Z_r = \frac{N_r}{\frac{1}{2}(t - q)}$$
-
-and where $q$, $r$ and $t$ are three consecutive subscripts with non-zero counts $N_q$, $N_r$, $N_t$. For the special
-case where $r$ is 1, we take $q = 0$. In the opposite special case, when $r = r_{last}$ is the index of the _last_
-non-zero count, replace the divisor $\frac{1}{2}(t-q)$ with $r_{last}-q$.
-
-**For unseen events:**
-
-$$P_{GT}(w_1...w_n) = \frac{N_1}{N}$$
-
-Here, we are using the _Turing_ estimate for small $r$ values, and the _Good-Turing_ estimate for large $r$ values.
-Since we are combining two different estimates of probabilities, we do not expect
-them to add to one. In this condition, our estimates are called _unnormalized_. We make sure that the
-probability estimates add to one by dividing by the total of the _unnormalized_ estimates. This is called
-_renormalization_.
-
-$$P_{SGT} = (1 - \frac{N_1}{N}) \frac{P^{unnorm}_r}{\sum P^{unnorm}_r} \hspace{5mm}r \geq 1$$
-
-This renormalized estimate is the _Simple Good-Turing_ (SGT) smoothing estimate. This is what we will be using here.
-
 > [!NOTE]
-> As can be seen in the renormalized probability above, the probability mass $\frac{N_1}{N}$ is reserved for
-unseen events, and hence, when predicting the next word, the probabilities of _ALL_ the predicted words will sum up
-to $1 - \frac{N_1}{N}$.
-
-### Linear Interpolation
-
-When performing this for a trigram, we estimate the trigram probabilities as follows:
-
-$$P(t_3|t_1, t_2) = \lambda_1\hat{P}(t_3) + \lambda_2\hat{P}(t_3|t_2) + \lambda_3\hat{P}(t_3|t_1, t_2)$$
-
-where $\hat{P}$ are the maximum likelihood estimates of the probabilities and $\lambda_1 + \lambda_2 + \lambda_3 = 1$
-so $P$ again represent probability distributions.
-
-The following is the algorithm to calculate the weights for context-independent linear interpolation λ₁, λ₂, λ₃ when
-the $n$-gram frequencies are known. N is the size of the corpus. If the denominator in one of the expressions
-is 0, we define the result of that expression to be 0. _**[Page 3 of ref [3](https://aclanthology.org/A00-1031.pdf)]**_
-
-```
-Set λ₁ = λ₂ = λ₃ = 0
-
-For each trigram t₁, t₂, t₃ with f(t₁, t₂, t₃) > 0:
-    Depending on the maximum of the following three values:
-    
-    Case f(t₁, t₂, t₃) - 1 / f(t₁, t₂) - 1:
-        Increment λ₃ by f(t₁, t₂, t₃)
-    
-    Case f(t₂, t₃) - 1 / f(t₂) - 1:
-        Increment λ₂ by f(t₁, t₂, t₃)
-    
-    Case f(t₃) - 1 / N - 1:
-        Increment λ₁ by f(t₁, t₂, t₃)
-        
-Normalize λ₁, λ₂, λ₃
-```
-
-This idea can be easily extrapolated to any $n$-gram, by simply considering the $n$-gram probability distribution as
-being
-dependent on all the previous $i$-gram's Maximum Likelihood Estimates (MLEs) (where $1 \leq i \leq n$).
-
----
-
-# Generation
-
-## Instructions to run
-
-```python3 generator.py <N> <lm_type> <corpus_path> <k> <gen_type>```  
-Here, `<lm_type>` must be one of `l` for Laplace Smoothing, `g` for Good-Turing Smoothing, `i` for Linear
-Interpolation, 'n' for No Smoothing.  
-`<N>` is the $N$-gram size, `<corpus_path>` is the path to the corpus, and `<gen_type>` must be one of `w` for Next Word
-generation (in which case, `<k>` is number of candidates for next word to be printed) or 's' for Sentence generation (in
-which case, `<k>` is number of next words to be generated in the sentence.)
-
-For sentence generation, the most probable word is chosen at each stage to form the sentence, until either `k` words
-are generated or the end of sentence token `<\s>` is generated.
+> For neural network models, if using the cross-entropy loss function, then perplexity is simply $\exp(loss)$. This
+> happens to be the case in my implementation.
 
 ---
 
