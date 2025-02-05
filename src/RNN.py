@@ -7,6 +7,9 @@ from tqdm import tqdm
 
 class RNNLM(nn.Module):
     """
+    Recurrent Neural Network Language Model for next word prediction.
+    Does not require a context window for next word prediction.
+
     RNN Ref: https://pytorch.org/docs/stable/generated/torch.nn.RNN.html
     LSTM Ref: https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
     GRU Ref: https://pytorch.org/docs/stable/generated/torch.nn.GRU.html
@@ -30,6 +33,7 @@ class RNNLM(nn.Module):
         :param patience: Number of consecutive iterations of validation loss being worse than the best validation loss (achieved during training) before terminating training.
         """
         super(RNNLM, self).__init__()
+
         self.learning_rate = learning_rate
         self.n_epochs = n_epochs
         self.hidden_size = hidden_size
@@ -91,6 +95,12 @@ class RNNLM(nn.Module):
         return logits
 
     def train_model(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None) -> None:
+        """
+        Training loop for the model.
+
+        :param train_loader: DataLoader for training data
+        :param val_loader: Optional DataLoader for validation data
+        """
         best_val_loss = float('inf')
         patience_counter = 0
 
