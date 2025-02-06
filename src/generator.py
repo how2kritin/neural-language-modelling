@@ -22,7 +22,7 @@ def set_seed(seed=42):
 @torch.no_grad()
 def generate_perplexity_report(model, vocab, data_loader, output_file):
     model.eval()
-    total_perplexity = 0.0
+    total_loss = 0.0
     count_sents = 0
     idx2word = {idx: word for word, idx in vocab.items()}
 
@@ -44,7 +44,7 @@ def generate_perplexity_report(model, vocab, data_loader, output_file):
                 perplexity = torch.exp(sentence_loss).item()
 
                 if not math.isnan(perplexity) and not math.isinf(perplexity):
-                    total_perplexity += perplexity
+                    total_loss += sentence_loss
                     count_sents += 1
 
                 words = [idx2word[idx.item()] for idx in inputs[i] if idx.item() != vocab['<PAD>']]
@@ -53,7 +53,8 @@ def generate_perplexity_report(model, vocab, data_loader, output_file):
                 words = [idx2word[idx.item()] for idx in inputs[i] if idx.item() != vocab['<PAD>']]
                 lines.append(f"{' '.join(words)}    N/A\n")
 
-    avg_perplexity = total_perplexity / count_sents if count_sents > 0 else float('nan')
+    avg_loss = total_loss / count_sents if count_sents > 0 else float('nan')
+    avg_perplexity = torch.exp(avg_loss)
 
     with open(output_file, 'w') as f:
         f.write(f"{avg_perplexity:.4f}\n")
@@ -64,6 +65,9 @@ def generate_perplexity_report(model, vocab, data_loader, output_file):
 
 def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: str,
          perplexity_report_name: str) -> None:
+    if lm_type == 'f' and not N:
+        raise ValueError("Need to specify the N value for corpus size!")
+
     set_seed(42)  # setting a seed for reproducibility
 
     glove_file = '../glove.6B.300d.txt'
@@ -76,13 +80,23 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
     except FileNotFoundError:
         raise FileNotFoundError("Unable to find a file at that path to use as the corpus!")
 
-    vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_datasets(
-        tokenized_sentences=tokenized_sentences, n_test_sents=1000, max_seq_len=50, batch_size=32)
+    if lm_type == 'r' or lm_type == 'l':
+        vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_datasets(
+            tokenized_sentences=tokenized_sentences, n_test_sents=1000, max_seq_len=50, batch_size=32)
+    else:
+        vocab, idx2word, train_loader, valid_loader, test_loader = obtain_ffnn_datasets(
+            tokenized_sentences=tokenized_sentences, n_test_sents=1000, context_size=N, batch_size=32)
+
     glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
 
-    model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
-                    'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
-                    'device': device}
+    if lm_type == 'r' or lm_type == 'l':
+        model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
+                        'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                        'device': device}
+    else:
+        model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300], 'pretrained_embeds': glove_embeds,
+                        'context_size': N, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5, 'device': device}
+
     match lm_type:
         case 'f':
             model = FFNNLM(**model_params)

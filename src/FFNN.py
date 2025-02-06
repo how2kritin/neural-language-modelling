@@ -11,10 +11,9 @@ class FFNNLM(nn.Module):
     Uses a context window of previous words to predict the next word.
     """
 
-    def __init__(self, learning_rate: float, vocab: dict, hidden_sizes: list[int],
-                 pretrained_embeds: torch.Tensor, context_size: int = 5,
-                 dropout_rate: float = 0.0, n_epochs: int = 10,
-                 patience: int = 3, device: str = "cpu"):
+    def __init__(self, learning_rate: float, vocab: dict, hidden_sizes: list[int], pretrained_embeds: torch.Tensor,
+                 context_size: int = 5, dropout_rate: float = 0.0, n_epochs: int = 10, patience: int = 3,
+                 device: str = "cpu"):
         """
         :param learning_rate: Learning rate of the model to start training with
         :param vocab: The vocabulary
@@ -47,12 +46,8 @@ class FFNNLM(nn.Module):
         prev_size = input_size
 
         for hidden_size in hidden_sizes:
-            layers.extend([
-                nn.Linear(prev_size, hidden_size),
-                nn.LayerNorm(hidden_size),
-                nn.ReLU(),
-                nn.Dropout(dropout_rate)
-            ])
+            layers.extend(
+                [nn.Linear(prev_size, hidden_size), nn.GELU(), nn.Dropout(dropout_rate), nn.LayerNorm(hidden_size)])
             prev_size = hidden_size
 
         layers.append(nn.Linear(prev_size, self.vocab_size))
@@ -65,11 +60,7 @@ class FFNNLM(nn.Module):
                 nn.init.zeros_(layer.bias)
 
         self.softmax = nn.Softmax(dim=-1)
-        self.optimizer = torch.optim.AdamW(
-            self.parameters(),
-            lr=self.learning_rate,
-            weight_decay=0.01  # L2 regularization
-        )
+        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=0.01, eps=1e-8)  # weight_decay for L2 regularization
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=vocab['<PAD>'], reduction='none')
 
         self.to(self.device)

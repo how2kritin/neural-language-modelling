@@ -52,28 +52,27 @@ class FFNNDataset(Dataset):
         super(FFNNDataset, self).__init__()
         self.vocab = vocab
         self.context_size = context_size
-
         self.contexts = []
         self.targets = []
 
-        pad_id = vocab['<PAD>']
-
         for sentence in sentences:
-            word_ids = [vocab.get(w, vocab['<UNK>']) for w in sentence]
-            padded_ids = [pad_id] * (context_size - 1) + word_ids
+            padded_sentence = ['<PAD>'] * (context_size - 1) + sentence
+            word_ids = [vocab.get(w, vocab['<UNK>']) for w in padded_sentence]
 
-            for i in range(len(word_ids)):
-                context = padded_ids[i:i + context_size]
-                target = word_ids[i]
+            for i in range(len(word_ids) - context_size):
+                context = word_ids[i:i + context_size]
+                target = word_ids[i + context_size]
 
-                self.contexts.append(context)
-                self.targets.append(target)
+                if target != vocab['<PAD>']:
+                    self.contexts.append(context)
+                    self.targets.append(target)
 
     def __len__(self):
         return len(self.contexts)
 
     def __getitem__(self, idx):
         return torch.tensor(self.contexts[idx]), torch.tensor(self.targets[idx])
+
 
 # helper functions to get datasets
 def obtain_rnn_datasets(tokenized_sentences: list[list[str]], n_test_sents: int,
@@ -146,10 +145,7 @@ def obtain_rnn_datasets(tokenized_sentences: list[list[str]], n_test_sents: int,
     return vocab, idx2word, train_loader, valid_loader, test_loader
 
 
-def obtain_ffnn_datasets(tokenized_sentences: List[List[str]],
-                         n_test_sents: int,
-                         context_size: int,
-                         batch_size: int):
+def obtain_ffnn_datasets(tokenized_sentences: List[List[str]], n_test_sents: int, context_size: int, batch_size: int):
     """
     :param tokenized_sentences: List of tokenized sentences
     :param n_test_sents: Number of test sentences
@@ -187,7 +183,7 @@ def obtain_ffnn_datasets(tokenized_sentences: List[List[str]],
     valid_dataset = FFNNDataset(valid_sentences, vocab, context_size)
     test_dataset = FFNNDataset(test_sentences, vocab, context_size)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 

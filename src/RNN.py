@@ -46,17 +46,9 @@ class RNNLM(nn.Module):
         self.patience = patience
         self.rnn_type = rnn_type.lower()
 
-        rnn_layer = {
-            'rnn': nn.RNN,
-            'lstm': nn.LSTM,
-            'gru': nn.GRU
-        }[self.rnn_type]
-        self.rnn = rnn_layer(
-            input_size=self.embedding_dim,
-            hidden_size=hidden_size,
-            num_layers=n_layers,
-            batch_first=True,
-            dropout=dropout_rate if n_layers > 1 else 0  # dropout between RNN's hidden layers
+        rnn_layer = {'rnn': nn.RNN, 'lstm': nn.LSTM, 'gru': nn.GRU}[self.rnn_type]
+        self.rnn = rnn_layer(input_size=self.embedding_dim, hidden_size=hidden_size, num_layers=n_layers,
+            batch_first=True, dropout=dropout_rate if n_layers > 1 else 0  # dropout between RNN's hidden layers
         )
         self.embeddings = nn.Embedding(self.vocab_size, self.embedding_dim)
         self.embeddings.weight.data.copy_(pretrained_embeds)
@@ -66,10 +58,8 @@ class RNNLM(nn.Module):
         nn.init.xavier_uniform_(self.fc.weight)
         nn.init.zeros_(self.fc.bias)
         self.softmax = nn.Softmax(dim=-1)
-        self.optimizer = torch.optim.AdamW(
-            self.parameters(),
-            lr=self.learning_rate,
-            weight_decay=0.01  # L2 regularization
+        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=0.01
+            # L2 regularization
         )
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=vocab['<PAD>'], reduction='none')
