@@ -3,6 +3,7 @@ from collections import Counter
 from typing import List, Tuple
 import random
 from torch.utils.data import DataLoader, Dataset
+from torch.nn.utils.rnn import pad_sequence
 
 
 # util functions
@@ -21,30 +22,56 @@ def load_glove_embeddings(glove_file: str, vocab: dict, embedding_dim: int, devi
 
 def build_vocab(tokens: List[str]) -> Tuple[dict, dict]:
     word_counts = Counter(tokens)
-    vocab = {word: idx for idx, (word, _) in enumerate(word_counts.items())}
-    vocab['<UNK>'] = len(vocab)
-    vocab['<PAD>'] = len(vocab)
+    vocab = {'<PAD>': 0, '<UNK>': 1, '<BOS>': 2, '<EOS>': 3}
+
+    for word, _ in word_counts.most_common():
+        if word not in vocab:
+            vocab[word] = len(vocab)
+
     idx2word = {idx: word for word, idx in vocab.items()}
     return vocab, idx2word
 
 
 # datasets
 class RNNDataset(Dataset):
-    def __init__(self, input_sentences, target_sentences, vocab: dict, seq_length: int = 20):
+    """
+    Reference on choosing labels and targets for time series data like RNNs: https://stackoverflow.com/questions/47008349/how-to-choose-label-target-for-rnn-models
+    """
+
+    def __init__(self, sequences: list[list[str]], vocab: dict):
         super(RNNDataset, self).__init__()
-        self.input_sentences = input_sentences
-        self.target_sentences = target_sentences
-        self.seq_length = seq_length
+        self.sequences = []
         self.vocab = vocab
 
+        for sequence in sequences:
+            sequence_with_tokens = ['<BOS>'] + sequence + ['<EOS>']
+
+            indices = [self.vocab.get(x, self.vocab['<UNK>']) for x in sequence_with_tokens]
+
+            input_seq = indices[:-1]
+            target_seq = indices[1:]
+
+            self.sequences.append((input_seq, target_seq))
+
     def __len__(self):
-        return len(self.input_sentences)
+        return len(self.sequences)
 
     def __getitem__(self, idx):
-        input_idxs = [self.vocab.get(w, self.vocab['<UNK>']) for w in self.input_sentences[idx]]
-        target_idxs = [self.vocab.get(w, self.vocab['<UNK>']) for w in self.target_sentences[idx]]
+        input_seq, target_seq = self.sequences[idx]
+        return torch.tensor(input_seq), torch.tensor(target_seq)
 
-        return torch.tensor(input_idxs), torch.tensor(target_idxs)
+    @staticmethod
+    def collate_batch(batch):
+        inputs, targets = zip(*batch)
+
+        inputs_padded = pad_sequence([torch.tensor(x) for x in inputs],
+                                     batch_first=True,
+                                     padding_value=0)
+        targets_padded = pad_sequence([torch.tensor(y) for y in targets],
+                                      batch_first=True,
+                                      padding_value=0)
+
+        return inputs_padded, targets_padded
 
 
 class FFNNDataset(Dataset):
@@ -76,13 +103,12 @@ class FFNNDataset(Dataset):
 
 # helper functions to get datasets
 def obtain_rnn_datasets(tokenized_sentences: list[list[str]], n_test_sents: int,
-                        max_seq_len: int, batch_size: int) -> Tuple[dict, dict, DataLoader, DataLoader, DataLoader]:
+                        batch_size: int) -> Tuple[dict, dict, DataLoader, DataLoader, DataLoader]:
     """
-    :param tokenized_sentences:
-    :param n_test_sents: Number of test sentences to consider.
-    :param max_seq_len:
-    :param batch_size:
-    :return: vocabulary (dict), idx2word (dict), train, validation and test dataloaders.
+    :param tokenized_sentences: List of tokenized sentences
+    :param n_test_sents: Number of test sentences to consider
+    :param batch_size: Batch size for DataLoader
+    :return: vocabulary (dict), idx2word (dict), train, validation and test dataloaders
     """
     random.shuffle(tokenized_sentences)
 
@@ -93,55 +119,34 @@ def obtain_rnn_datasets(tokenized_sentences: list[list[str]], n_test_sents: int,
     train_size = int(0.9 * remaining_data)
     val_size = remaining_data - train_size
 
-    pad_token = "<PAD>"
+    train_sentences = tokenized_sentences[:train_size]
+    valid_sentences = tokenized_sentences[train_size:train_size + val_size]
+    test_sentences = tokenized_sentences[train_size + val_size:]
 
-    input_tokenized_corpus = []
-    target_tokenized_corpus = []
+    print(f"Number of training sentences: {len(train_sentences)}")
+    print(f"Number of validation sentences: {len(valid_sentences)}")
+    print(f"Number of test sentences: {len(test_sentences)}")
 
-    for sentence in tokenized_sentences:
-        for i in range(0, len(sentence), max_seq_len - 1):
-            input_seq = sentence[i: i + max_seq_len - 1]
-
-            if len(input_seq) < max_seq_len:
-                input_seq += [pad_token] * (max_seq_len - len(input_seq))
-
-            target_seq = input_seq[1:] + [pad_token]
-
-            input_tokenized_corpus.append(input_seq)
-            target_tokenized_corpus.append(target_seq)
-
-    # split the sentences into train, test and validation
-    input_train_sentences = input_tokenized_corpus[:train_size]
-    input_valid_sentences = input_tokenized_corpus[train_size: train_size + val_size]
-    input_test_sentences = input_tokenized_corpus[train_size + val_size:]
-
-    target_train_sentences = target_tokenized_corpus[:train_size]
-    target_valid_sentences = target_tokenized_corpus[train_size: train_size + val_size]
-    target_test_sentences = target_tokenized_corpus[train_size + val_size:]
-
-    print(f"num total_tokenized_{max_seq_len}_length_sentences: ", len(input_tokenized_corpus))
-    print(f"num train_tokenized_{max_seq_len}_length_sentences: ", len(input_train_sentences))
-    print(f"num valid_tokenized_{max_seq_len}_length_sentences: ", len(input_valid_sentences))
-    print(f"num test_tokenized_{max_seq_len}_length_sentences: ", len(input_test_sentences))
-
-    train_tokenized_corpus = tokenized_sentences[:train_size]
+    # build vocabulary from training data only
     tokens = []
-    for sentence in train_tokenized_corpus:  # only include train vocab in the vocabulary
+    for sentence in train_sentences:
         tokens.extend(sentence)
 
     vocab, idx2word = build_vocab(tokens)
     print("Vocabulary created from training dataset, which has been randomly sampled from the corpus.")
 
-    train_dataset = RNNDataset(input_train_sentences, target_train_sentences, vocab, seq_length=max_seq_len)
-    valid_dataset = RNNDataset(input_valid_sentences, target_valid_sentences, vocab, seq_length=max_seq_len)
-    test_dataset = RNNDataset(input_test_sentences, target_test_sentences, vocab, seq_length=max_seq_len)
+    train_dataset = RNNDataset(train_sentences, vocab)
+    valid_dataset = RNNDataset(valid_sentences, vocab)
+    test_dataset = RNNDataset(test_sentences, vocab)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              collate_fn=train_dataset.collate_batch)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False,
+                              collate_fn=valid_dataset.collate_batch)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                             collate_fn=test_dataset.collate_batch)
 
     print("Data Loaded Successfully")
-
     return vocab, idx2word, train_loader, valid_loader, test_loader
 
 
@@ -183,12 +188,11 @@ def obtain_ffnn_datasets(tokenized_sentences: List[List[str]], n_test_sents: int
     valid_dataset = FFNNDataset(valid_sentences, vocab, context_size)
     test_dataset = FFNNDataset(test_sentences, vocab, context_size)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     print("Data Loaded Successfully")
-    print(f"Samples per epoch: {len(train_dataset)}")
     print(f"Context size: {context_size}")
 
     return vocab, idx2word, train_loader, valid_loader, test_loader

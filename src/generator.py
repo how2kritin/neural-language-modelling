@@ -82,20 +82,23 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
     if lm_type == 'r' or lm_type == 'l':
         vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_datasets(
-            tokenized_sentences=tokenized_sentences, n_test_sents=1000, max_seq_len=50, batch_size=32)
+            tokenized_sentences=tokenized_sentences, n_test_sents=1000, batch_size=32)
     else:
         vocab, idx2word, train_loader, valid_loader, test_loader = obtain_ffnn_datasets(
             tokenized_sentences=tokenized_sentences, n_test_sents=1000, context_size=N, batch_size=32)
 
     glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
 
-    if lm_type == 'r' or lm_type == 'l':
+    if lm_type == 'l':
+        model_params = {'learning_rate': 1e-4, 'vocab': vocab, 'hidden_size': 256, 'n_layers': 2,
+            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5, 'device': device}
+    elif lm_type == 'r':
         model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
-                        'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
-                        'device': device}
+            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5, 'device': device}
     else:
-        model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300], 'pretrained_embeds': glove_embeds,
-                        'context_size': N, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5, 'device': device}
+        model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300],
+                        'pretrained_embeds': glove_embeds, 'context_size': N, 'dropout_rate': 0.3, 'n_epochs': 100,
+                        'patience': 5, 'device': device}
 
     match lm_type:
         case 'f':
