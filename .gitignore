@@ -5,4 +5,5 @@ test.py
 Report.pdf
 glove.6B.300d.txt
 word_embeddings
-pretrained_models
+pretrained_models/*
+!pretrained_models/.gitkeep

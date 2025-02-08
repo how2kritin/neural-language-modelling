@@ -12,7 +12,7 @@ class FFNNLM(nn.Module):
     """
 
     def __init__(self, learning_rate: float, vocab: dict, hidden_sizes: list[int], pretrained_embeds: torch.Tensor,
-                 context_size: int = 5, dropout_rate: float = 0.0, n_epochs: int = 10, patience: int = 3,
+                 context_size: int = 4, dropout_rate: float = 0.0, n_epochs: int = 10, patience: int = 3,
                  device: str = "cpu"):
         """
         :param learning_rate: Learning rate of the model to start training with

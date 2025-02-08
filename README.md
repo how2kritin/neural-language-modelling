@@ -13,6 +13,8 @@ Introduction to Natural Language Processing course at IIIT Hyderabad, taken in t
 3. [pytorch](https://pytorch.org/get-started/locally/)
 4. (OPTIONAL) `virtualenv` to create a virtual environment.
 5. All the python libraries mentioned in `requirements.txt`.
+6. Pre-trained [GloVe](https://nlp.stanford.edu/projects/glove/) word embeddings (assumed to be `glove.6B.300d`, change
+   it if required in the `main()` function in `src/generator.py`).
 
 ---
 
@@ -30,7 +32,7 @@ tokens. Additionally, processing URLs, mentions, ages, hashtags and time data.
 ### Usage
 
 ```bash
-python3 generator.py -l <lm_type> -c <corpus_path> -t <task> [-n <N>] [-k <num_words>] [-m <model_path>] [-p <report_name>]
+python3 -m src.generator -l <lm_type> -c <corpus_path> -t <task> [-n <N>] [-k <num_words>] [-m <model_path>] [-p <report_name>]
 ```
 
 ### Arguments
@@ -54,11 +56,11 @@ python3 generator.py -l <lm_type> -c <corpus_path> -t <task> [-n <N>] [-k <num_w
 ### Example Usage
 
 ```bash
-python3 generator.py -l f -c data/corpus.txt -t pr
+python3 -m src.generator -l f -c corpus/corpus.txt -t pr
 ```
 
 ```bash
-python3 generator.py -l r -c data/corpus.txt -t pe -p report.txt
+python3 -m src.generator -l r -c corpus/corpus.txt -t pe -p report.txt
 ```
 
 ## How to obtain perplexity?
@@ -79,7 +81,7 @@ for the sake of numerical stability.
 
 > [!NOTE]
 > For neural network models, if using the cross-entropy loss function, then perplexity is simply $\exp(loss)$. This
-> happens to be the case in my implementation.
+> happens to be the case in my implementation of RNN and FFNN models.
 
 ---
 

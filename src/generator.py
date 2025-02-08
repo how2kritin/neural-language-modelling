@@ -5,10 +5,11 @@ from tqdm import tqdm
 import torch
 import random
 import numpy as np
-from tokenizer import word_tokenizer
-from create_word_embeddings import obtain_rnn_datasets, obtain_ffnn_datasets, load_glove_embeddings
-from RNN import RNNLM
-from FFNN import FFNNLM
+from src.data_processing.tokenizer import word_tokenizer
+from src.data_processing.utils import load_glove_embeddings
+from src.data_processing.dataloaders import obtain_rnn_dataloaders, obtain_ffnn_dataloaders
+from src.models.RNN import RNNLM
+from src.models.FFNN import FFNNLM
 
 
 def set_seed(seed=42):
@@ -70,7 +71,7 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
     set_seed(42)  # setting a seed for reproducibility
 
-    glove_file = '../glove.6B.300d.txt'
+    glove_file = 'glove.6B.300d.txt'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     try:
@@ -81,23 +82,25 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
         raise FileNotFoundError("Unable to find a file at that path to use as the corpus!")
 
     if lm_type == 'r' or lm_type == 'l':
-        vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_datasets(
+        vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_dataloaders(
             tokenized_sentences=tokenized_sentences, n_test_sents=1000, batch_size=32)
     else:
-        vocab, idx2word, train_loader, valid_loader, test_loader = obtain_ffnn_datasets(
-            tokenized_sentences=tokenized_sentences, n_test_sents=1000, context_size=N, batch_size=32)
+        vocab, idx2word, train_loader, valid_loader, test_loader = obtain_ffnn_dataloaders(
+            tokenized_sentences=tokenized_sentences, n_test_sents=1000, n=N, batch_size=32)
 
     glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
 
     if lm_type == 'l':
         model_params = {'learning_rate': 1e-4, 'vocab': vocab, 'hidden_size': 256, 'n_layers': 2,
-            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5, 'device': device}
+                        'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                        'device': device}
     elif lm_type == 'r':
         model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
-            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5, 'device': device}
+                        'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                        'device': device}
     else:
         model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300],
-                        'pretrained_embeds': glove_embeds, 'context_size': N, 'dropout_rate': 0.3, 'n_epochs': 100,
+                        'pretrained_embeds': glove_embeds, 'context_size': N - 1, 'dropout_rate': 0.3, 'n_epochs': 100,
                         'patience': 5, 'device': device}
 
     match lm_type:
