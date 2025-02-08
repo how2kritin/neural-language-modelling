@@ -142,7 +142,7 @@ class RNNLM(nn.Module):
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss
                     patience_counter = 0
-                    torch.save(self.state_dict(), 'best_model.pt')
+                    torch.save(self.state_dict(), 'pretrained_models/best_model.pt')
                 else:
                     patience_counter += 1
 
@@ -157,17 +157,18 @@ class RNNLM(nn.Module):
                 print(f'Epoch {epoch + 1}, '
                       f'Train Loss: {avg_train_loss:.4f}, Train Perplexity: {train_perplexity:.4f}')
 
-        torch.save(self.state_dict(), 'final_model.pt')
+        torch.save(self.state_dict(), 'pretrained_models/final_model.pt')
 
     def predict_top_k(self, x: torch.Tensor, k: int) -> list:
         """
         To predict the top-k most probable candidates for the next word, given a context.
-        :param x: Input tensor (batch_size, sequence_length, embedding_dim).
+        :param x: Input tensor (batch_size, sequence_length) for indices.
         :param k: Number of top candidates to return.
-        :return: List of top-k word indices and their probabilities.
+        :return: List of tuples [(indices, probs)] for the batch.
         """
         self.eval()
         with torch.no_grad():
             probabilities = self.softmax(self(x))
-            top_k_probs, top_k_indices = torch.topk(probabilities, k, dim=-1)
+            last_position_probs = probabilities[:, -1, :]  # shape: (batch_size, vocab_size)
+            top_k_probs, top_k_indices = torch.topk(last_position_probs, k, dim=-1)
             return [(indices.tolist(), probs.tolist()) for indices, probs in zip(top_k_indices, top_k_probs)]

@@ -84,31 +84,29 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
     if lm_type == 'r' or lm_type == 'l':
         vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_dataloaders(
             tokenized_sentences=tokenized_sentences, n_test_sents=1000, batch_size=32)
-    else:
+    elif lm_type == 'f':
         vocab, idx2word, train_loader, valid_loader, test_loader = obtain_ffnn_dataloaders(
             tokenized_sentences=tokenized_sentences, n_test_sents=1000, n=N, batch_size=32)
+    else:
+        raise ValueError("Invalid lm_type!")
 
     glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
 
-    if lm_type == 'l':
-        model_params = {'learning_rate': 1e-4, 'vocab': vocab, 'hidden_size': 256, 'n_layers': 2,
-                        'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
-                        'device': device}
-    elif lm_type == 'r':
-        model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
-                        'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
-                        'device': device}
-    else:
-        model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300],
-                        'pretrained_embeds': glove_embeds, 'context_size': N - 1, 'dropout_rate': 0.3, 'n_epochs': 100,
-                        'patience': 5, 'device': device}
-
     match lm_type:
         case 'f':
+            model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300],
+                            'pretrained_embeds': glove_embeds, 'context_size': N - 1, 'dropout_rate': 0.3,
+                            'n_epochs': 100, 'patience': 5, 'device': device}
             model = FFNNLM(**model_params)
         case 'r':
+            model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
+                            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                            'device': device}
             model = RNNLM(**model_params, rnn_type='rnn')
         case 'l':
+            model_params = {'learning_rate': 1e-4, 'vocab': vocab, 'hidden_size': 256, 'n_layers': 2,
+                            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                            'device': device}
             model = RNNLM(**model_params, rnn_type='lstm')
         case _:
             raise ValueError("Please choose a valid model! Acceptable inputs: {f, r, l}")
@@ -130,6 +128,37 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
         print(f"Training Set Average Perplexity: {train_avg_ppl:.4f}")
         print(f"Test Set Average Perplexity: {test_avg_ppl:.4f}")
+    elif task == 'pr':
+        if not k:  # by default get top 3 candidates if k isn't specified
+            k = 3
+
+        inp_sentence = input("input sentence: ")
+        words = word_tokenizer(inp_sentence)[0]
+
+        indices = []
+        for word in words:
+            if word in vocab:
+                indices.append(vocab[word])
+            else:
+                indices.append(vocab['<UNK>'])
+
+        if lm_type == 'f':
+            if len(indices) < N - 1:
+                padding_needed = N - 1 - len(indices)
+                indices = [vocab['<PAD>']] * padding_needed + indices
+            else:
+                indices = indices[-(N - 1):]  # take last N-1 words if context is longer than N-1 words
+        else:
+            indices = [vocab['<BOS>']] + indices
+
+        x = torch.tensor([indices], dtype=torch.long, device=device)
+
+        indices_list, probs_list = model.predict_top_k(x, k)[0]  # take first batch
+        for idx, prob in zip(indices_list, probs_list):
+            word = idx2word[idx]
+            print(f"{word} {prob:.3f}")
+    else:
+        raise ValueError("Invalid task!")
 
 
 if __name__ == "__main__":

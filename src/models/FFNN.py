@@ -139,7 +139,7 @@ class FFNNLM(nn.Module):
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss
                     patience_counter = 0
-                    torch.save(self.state_dict(), 'best_model.pt')
+                    torch.save(self.state_dict(), 'pretrained_models/best_model.pt')
                 else:
                     patience_counter += 1
 
@@ -154,7 +154,7 @@ class FFNNLM(nn.Module):
                 print(f'Epoch {epoch + 1}, '
                       f'Train Loss: {avg_train_loss:.4f}, Train Perplexity: {train_perplexity:.4f}')
 
-        torch.save(self.state_dict(), 'final_model.pt')
+        torch.save(self.state_dict(), 'pretrained_models/final_model.pt')
 
     def predict_top_k(self, x: torch.Tensor, k: int) -> list:
         """
