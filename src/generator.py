@@ -115,6 +115,7 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
     if model_path and os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path))
+        print("Successfully loaded the pre-trained model!")
     else:
         print("Could not find a pre-trained model. Training model now...")
         model.train_model(train_loader, valid_loader)
@@ -123,9 +124,9 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
     if task == 'pe':
         if not perplexity_report_name: perplexity_report_name = "report"
         train_avg_ppl = generate_perplexity_report(model, vocab, train_loader,
-                                                   f"../perplexity_scores/{perplexity_report_name}_train-perplexities.txt")
+                                                   f"perplexity_scores/{perplexity_report_name}_train-perplexities.txt")
         test_avg_ppl = generate_perplexity_report(model, vocab, test_loader,
-                                                  f"../perplexity_scores/{perplexity_report_name}_test-perplexities.txt")
+                                                  f"perplexity_scores/{perplexity_report_name}_test-perplexities.txt")
 
         print(f"Training Set Average Perplexity: {train_avg_ppl:.4f}")
         print(f"Test Set Average Perplexity: {test_avg_ppl:.4f}")
