@@ -132,31 +132,32 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
         if not k:  # by default get top 3 candidates if k isn't specified
             k = 3
 
-        inp_sentence = input("input sentence: ")
-        words = word_tokenizer(inp_sentence)[0]
+        while True:
+            inp_sentence = input("input sentence: ")
+            words = word_tokenizer(inp_sentence)[0]
 
-        indices = []
-        for word in words:
-            if word in vocab:
-                indices.append(vocab[word])
+            indices = []
+            for word in words:
+                if word in vocab:
+                    indices.append(vocab[word])
+                else:
+                    indices.append(vocab['<UNK>'])
+
+            if lm_type == 'f':
+                if len(indices) < N - 1:
+                    padding_needed = N - 1 - len(indices)
+                    indices = [vocab['<PAD>']] * padding_needed + indices
+                else:
+                    indices = indices[-(N - 1):]  # take last N-1 words if context is longer than N-1 words
             else:
-                indices.append(vocab['<UNK>'])
+                indices = [vocab['<BOS>']] + indices
 
-        if lm_type == 'f':
-            if len(indices) < N - 1:
-                padding_needed = N - 1 - len(indices)
-                indices = [vocab['<PAD>']] * padding_needed + indices
-            else:
-                indices = indices[-(N - 1):]  # take last N-1 words if context is longer than N-1 words
-        else:
-            indices = [vocab['<BOS>']] + indices
+            x = torch.tensor([indices], dtype=torch.long, device=device)
 
-        x = torch.tensor([indices], dtype=torch.long, device=device)
-
-        indices_list, probs_list = model.predict_top_k(x, k)[0]  # take first batch
-        for idx, prob in zip(indices_list, probs_list):
-            word = idx2word[idx]
-            print(f"{word} {prob:.3f}")
+            indices_list, probs_list = model.predict_top_k(x, k)[0]  # take first batch
+            for idx, prob in zip(indices_list, probs_list):
+                word = idx2word[idx]
+                print(f"{word} {prob:.3f}")
     else:
         raise ValueError("Invalid task!")
 
