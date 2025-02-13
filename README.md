@@ -20,7 +20,7 @@ Introduction to Natural Language Processing course at IIIT Hyderabad, taken in t
 
 # Tokenization
 
-Using NLTK with `punkt_tab` tokenizer to tokenize corpus into list of sentences, where each sentence is a list of
+Using regex to tokenize corpus into list of sentences, where each sentence is a list of
 tokens. Additionally, processing URLs, mentions, ages, hashtags and time data.
 
 ---

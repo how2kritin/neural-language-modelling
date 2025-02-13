@@ -2,6 +2,8 @@
 
 ## Roll Number: 2022101071
 
+## Link to Pre-Trained Models: https://drive.google.com/drive/folders/1wQkRt9-HppJz4t-OdOp73AZNFrZ2pdfq?usp=sharing
+
 ---
 
 ---
@@ -23,14 +25,14 @@
 
 | Model | N | Dataset             | Train | Test |
 |-------|---|---------------------|-------|------|
-| FFNN  | 3 | Pride and Prejudice | 33    | 128  |
-| FFNN  | 3 | Ulysses             | 169   | 405  |
-| FFNN  | 5 | Pride and Prejudice | 41    | 144  |
-| FFNN  | 5 | Ulysses             | 213   | 397  |
-| RNN   | - | Pride and Prejudice | 27    | 84   |
-| RNN   | - | Ulysses             | 46    | 176  |
-| LSTM  | - | Pride and Prejudice | 26    | 71   |
-| LSTM  | - | Ulysses             | 51    | 174  |
+| FFNN  | 3 | Pride and Prejudice | 45    | 126  |
+| FFNN  | 3 | Ulysses             | 179   | 448  |
+| FFNN  | 5 | Pride and Prejudice | 43    | 146  |
+| FFNN  | 5 | Ulysses             | 182   | 437  |
+| RNN   | - | Pride and Prejudice | 32    | 84   |
+| RNN   | - | Ulysses             | 96    | 196  |
+| LSTM  | - | Pride and Prejudice | 29    | 72   |
+| LSTM  | - | Ulysses             | 88    | 183  |
 
 ### Results from the previous assignment for comparison:
 

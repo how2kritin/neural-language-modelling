@@ -5,25 +5,34 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 # datasets
+import torch
+from typing import List
+from torch.utils.data import Dataset
+from torch.nn.utils.rnn import pad_sequence
+
+
 class RNNDataset(Dataset):
     """
     Reference on choosing labels and targets for time series data like RNNs: https://stackoverflow.com/questions/47008349/how-to-choose-label-target-for-rnn-models
     """
 
-    def __init__(self, sequences: list[list[str]], vocab: dict):
+    def __init__(self, sequences: list[list[str]], vocab: dict, max_seq_length: int = 50):
         super(RNNDataset, self).__init__()
         self.sequences = []
         self.vocab = vocab
 
         for sequence in sequences:
+            # adding BOS and EOS only once for the full sequence
             sequence_with_tokens = ['<BOS>'] + sequence + ['<EOS>']
-
             indices = [self.vocab.get(x, self.vocab['<UNK>']) for x in sequence_with_tokens]
 
-            input_seq = indices[:-1]
-            target_seq = indices[1:]
-
-            self.sequences.append((input_seq, target_seq))
+            # break the full tokenized sequence into chunks of max_seq_length
+            for i in range(0, len(indices), max_seq_length):
+                chunk = indices[i:i + max_seq_length + 1]  # +1 to include target for last token
+                if len(chunk) > 1:
+                    input_seq = chunk[:-1]
+                    target_seq = chunk[1:]
+                    self.sequences.append((input_seq, target_seq))
 
     def __len__(self):
         return len(self.sequences)

@@ -83,7 +83,7 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
     if lm_type == 'r' or lm_type == 'l':
         vocab, idx2word, train_loader, valid_loader, test_loader = obtain_rnn_dataloaders(
-            tokenized_sentences=tokenized_sentences, n_test_sents=1000, batch_size=32)
+            tokenized_sentences=tokenized_sentences, n_test_sents=1000, batch_size=32, max_seq_length=128)
     elif lm_type == 'f':
         vocab, idx2word, train_loader, valid_loader, test_loader = obtain_ffnn_dataloaders(
             tokenized_sentences=tokenized_sentences, n_test_sents=1000, n=N, batch_size=32)
@@ -117,7 +117,7 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
     else:
         print("Could not find a pre-trained model. Training model now...")
         model.train_model(train_loader, valid_loader)
-        model.load_state_dict(torch.load('best_model.pt'))
+        model.load_state_dict(torch.load('pretrained_models/best_model.pt'))
 
     if task == 'pe':
         if not perplexity_report_name: perplexity_report_name = "report"

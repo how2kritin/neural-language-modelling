@@ -36,21 +36,22 @@ def _vocab_idxwordmap_train_valid_test_split(tokenized_sentences: list[list[str]
     return vocab, idx2word, train_sentences, valid_sentences, test_sentences
 
 
-def obtain_rnn_dataloaders(tokenized_sentences: list[list[str]], n_test_sents: int, batch_size: int) -> Tuple[
+def obtain_rnn_dataloaders(tokenized_sentences: list[list[str]], n_test_sents: int, batch_size: int, max_seq_length: int = 128) -> Tuple[
     dict, dict, DataLoader, DataLoader, DataLoader]:
     """
     :param tokenized_sentences: List of tokenized sentences
     :param n_test_sents: Number of test sentences to consider
     :param batch_size: Batch size for DataLoader
+    :param max_seq_length: Max length of each sentence (set this accordingly so that you don't run out of memory while training)
     :return: vocabulary (dict), idx2word (dict), train, validation and test dataloaders
     """
     vocab, idx2word, train_sentences, valid_sentences, test_sentences = _vocab_idxwordmap_train_valid_test_split(tokenized_sentences, n_test_sents)
 
-    train_dataset = RNNDataset(train_sentences, vocab)
-    valid_dataset = RNNDataset(valid_sentences, vocab)
-    test_dataset = RNNDataset(test_sentences, vocab)
+    train_dataset = RNNDataset(train_sentences, vocab, max_seq_length)
+    valid_dataset = RNNDataset(valid_sentences, vocab, max_seq_length)
+    test_dataset = RNNDataset(test_sentences, vocab, max_seq_length)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False,
                               collate_fn=train_dataset.collate_batch)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False,
                               collate_fn=valid_dataset.collate_batch)
@@ -75,7 +76,7 @@ def obtain_ffnn_dataloaders(tokenized_sentences: List[List[str]], n_test_sents: 
     valid_dataset = FFNNDataset(valid_sentences, vocab, n - 1)
     test_dataset = FFNNDataset(test_sentences, vocab, n - 1)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
