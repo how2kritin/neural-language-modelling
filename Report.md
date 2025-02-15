@@ -85,7 +85,7 @@ In fact, these models have the smallest gap between train and test perplexities,
 
 These are slightly worse than LSTM-based models, primarily because they tend to forget info as new info comes in.
 However, they still are much better than Feed-Forward Neural Network models, as they can observe relatively long-range
-dependencies as they do not need to depend on a context window.
+dependencies since they do not need to depend on a context window.
 
 #### FFNN-based models
 
@@ -97,6 +97,9 @@ models (either RNN/LSTM layers).
 
 Good-Turing seems to work better here, due to an efficient probability estimation method (which is pretty comprehensive)
 for rare events, and honestly, it doesn't require much hyperparameter tuning; they work well right out of the box.
+However, one drawback with Good-Turing models, is that they assign a fixed probability mass to unseen events (this
+probability assignment is deterministic), which tends to fail in cases where the number of n-grams seen only once is
+high (as these events will have a very large probability mass assigned to them).
 
 ### Observations
 
@@ -105,27 +108,24 @@ for rare events, and honestly, it doesn't require much hyperparameter tuning; th
 For longer sentences (i.e., sentences from the Ulysses dataset, which are longer and more complex on average),
 LSTM models hit other models out of the park, due to their ability to "remember" and observe long-range dependencies.
 
-RNNs are decent as well. However, the difference in perplexity scores between them isn't large, primarily because the "
-long-term" dependencies in Ulysses aren't as long, rather, local
-context seems to be more important for this dataset. The complexity arises more from vocabulary than from long-range
-dependencies. (hence, on a pre-trained word embedding method, a lot of words in this dataset are tagged as `<UNK>`.
-Perhaps, in a much larger GloVe embedding size, some of these words may exist.)
-
-However, judging by the perplexity scores, it seems as though the Pride and Prejudice dataset has more long-range
-dependencies, as compared to the Ulysses dataset. Here, we see a clear winner; LSTM models can "remember" context
-better, and thus they perform better than their RNN counterparts.
+They are better than their RNN counterparts, as LSTMs remember these dependencies better than RNNs, due to the presence
+of gates to manage input and output state flow. RNNs meanwhile, lack these gates and tend to "forget" old context as new
+one comes in. Thus, they fail to identify long-range dependencies correctly.
 
 #### How does the choice of n-gram size affect the performance of the FFNN model?
 
 For FFNN models, a larger N implies that there's more input features, and more parameters to learn. However, there is a
-higher risk of overfitting. More complex text, such as the Ulysses dataset, **slightly** (again, not by much) benefits
-from a larger context, but simpler text, such as the Pride and Prejudice dataset, performs better with smaller context.
+higher risk of overfitting. More complex text, such as the Ulysses dataset, **slightly** (but not by much) benefits
+from a larger context, but simpler text, such as the Pride and Prejudice dataset, performs **slightly** better with
+smaller context (again, not by much).
+
 Here, as Pride and Prejudice dataset has a more standard language with regular patterns, larger N tends to hurt
 performance and simpler patterns are sufficient (and larger context windows seem to introduce the model to spurious
-patterns). On the contrary, for a language with non-standard patterns and complex vocabulary, larger N helps slightly
+patterns). On the contrary, for a language with non-standard patterns and complex vocabulary, larger N seems to help
 (there's a benefit from extra context).
 
-Hence, for standard text, prefer a smaller context window (like N = 3) and for more complex text, prefer a larger
-context window (like N = 5). 
+Hence, for text with simple sentences and ones where long-range dependencies are absent, prefer a smaller context
+window (like N = 3) and for more complex text with longer sentences possessing long-range dependencies, prefer a larger
+context window (like N = 5).
 
 ---
