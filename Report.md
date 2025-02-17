@@ -70,6 +70,8 @@
 5. N-gram models with Linear Interpolation
 6. N-gram models with Laplace Smoothing
 
+---
+
 ### Comparative Analysis
 
 #### LSTM models
@@ -87,7 +89,7 @@ These are slightly worse than LSTM-based models, primarily because they tend to 
 However, they still are much better than Feed-Forward Neural Network models, as they can observe relatively long-range
 dependencies since they do not need to depend on a context window.
 
-#### FFNN-based models
+#### FFNN-based models v/s Good-Turing Models
 
 While these models are, on average, better than most n-gram models, they seem to perform worse than N-gram models with
 Good-Turing Smoothing, going purely based off of the perplexity scores. This could be due to them suffering from neural
@@ -100,6 +102,23 @@ for rare events, and honestly, it doesn't require much hyperparameter tuning; th
 However, one drawback with Good-Turing models, is that they assign a fixed probability mass to unseen events (this
 probability assignment is deterministic), which tends to fail in cases where the number of n-grams seen only once is
 high (as these events will have a very large probability mass assigned to them).
+
+#### N-gram models with Linear Interpolation
+
+These models perform okay-ish; they essentially work on the "ensemble models" principle (using multiple N-gram models of
+different N values). While you can apply smoothing to each of these models as well, in this case, they're not smoothed.
+So, they suffer in the case where they have to assign a probability to OOV (out of vocabulary) words (it's 0).
+Furthermore, you would need to choose an optimal way of weighting each model in the ensemble of N-grams. A learning
+algorithm, such as the EM algorithm could work better.
+
+#### N-gram models with Laplace Smoothing
+
+These models perform poorly. This is because Laplace Smoothing isn't a very good smoothing method, especially when the
+size of the vocabulary is large (thus, the denominator is large). Furthermore, pretending to have seen each n-gram once
+more than it has actually been seen is also a little too much probability assigned to unseen contexts. (could choose a
+smaller value to add in the numerator)
+
+---
 
 ### Observations
 
