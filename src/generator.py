@@ -1,15 +1,17 @@
 import argparse
 import math
 import os.path
-from tqdm import tqdm
-import torch
 import random
+
 import numpy as np
+import torch
+from tqdm import tqdm
+
+from src.data_processing.dataloaders import obtain_rnn_dataloaders, obtain_ffnn_dataloaders
 from src.data_processing.tokenizer import word_tokenizer
 from src.data_processing.utils import load_glove_embeddings
-from src.data_processing.dataloaders import obtain_rnn_dataloaders, obtain_ffnn_dataloaders
-from src.models.RNN import RNNLM
 from src.models.FFNN import FFNNLM
+from src.models.RNN import RNNLM
 
 
 def set_seed(seed=42):
@@ -64,6 +66,29 @@ def generate_perplexity_report(model, vocab, data_loader, output_file):
     return avg_perplexity
 
 
+def pick_model(lm_type: str, vocab: dict, glove_embeds: torch.Tensor, device: str, N: int) -> FFNNLM | RNNLM:
+    match lm_type:
+        case 'f':
+            model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300],
+                            'pretrained_embeds': glove_embeds, 'context_size': N - 1, 'dropout_rate': 0.3,
+                            'n_epochs': 100, 'patience': 5, 'device': device}
+            model = FFNNLM(**model_params)
+        case 'r':
+            model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
+                            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                            'device': device}
+            model = RNNLM(**model_params, rnn_type='rnn')
+        case 'l':
+            model_params = {'learning_rate': 1e-4, 'vocab': vocab, 'hidden_size': 256, 'n_layers': 2,
+                            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
+                            'device': device}
+            model = RNNLM(**model_params, rnn_type='lstm')
+        case _:
+            raise ValueError("Please choose a valid model! Acceptable inputs: {f, r, l}")
+
+    return model
+
+
 def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: str,
          perplexity_report_name: str) -> None:
     if lm_type == 'f' and not N:
@@ -92,24 +117,7 @@ def main(N: int, lm_type: str, corpus_path: str, k: int, model_path: str, task: 
 
     glove_embeds = load_glove_embeddings(glove_file=glove_file, vocab=vocab, embedding_dim=300, device=device)
 
-    match lm_type:
-        case 'f':
-            model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_sizes': [N * 300],
-                            'pretrained_embeds': glove_embeds, 'context_size': N - 1, 'dropout_rate': 0.3,
-                            'n_epochs': 100, 'patience': 5, 'device': device}
-            model = FFNNLM(**model_params)
-        case 'r':
-            model_params = {'learning_rate': 5e-5, 'vocab': vocab, 'hidden_size': 512, 'n_layers': 3,
-                            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
-                            'device': device}
-            model = RNNLM(**model_params, rnn_type='rnn')
-        case 'l':
-            model_params = {'learning_rate': 1e-4, 'vocab': vocab, 'hidden_size': 256, 'n_layers': 2,
-                            'pretrained_embeds': glove_embeds, 'dropout_rate': 0.3, 'n_epochs': 100, 'patience': 5,
-                            'device': device}
-            model = RNNLM(**model_params, rnn_type='lstm')
-        case _:
-            raise ValueError("Please choose a valid model! Acceptable inputs: {f, r, l}")
+    model = pick_model(lm_type, vocab, glove_embeds, device, N)
 
     if model_path and os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path))
